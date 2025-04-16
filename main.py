@@ -19,26 +19,28 @@ MAX_SIZE_MB = 50
 def readable_size(size_bytes):
     mb = size_bytes / (1024 * 1024)
     return f"{mb:.2f} MB"
-
+    
 def reencode_video(input_path: str) -> str:
-    os.makedirs("downloads", exist_ok=True)
-
+    import tempfile
     safe_input = "downloads/input_safe.mp4"
     output_path = "downloads/output_ios.mp4"
 
     try:
         shutil.copy(input_path, safe_input)
+        print(f"✅ Copied to: {safe_input}")
     except Exception as e:
         raise Exception(f"❌ Failed to copy input: {e}")
 
     if not os.path.exists(safe_input):
-        raise Exception("❌ input_safe.mp4 missing after copy.")
+        raise Exception("❌ input_safe.mp4 not found.")
 
     command = [
         "ffmpeg",
-        "-y",  # overwrite without asking
+        "-hide_banner",
+        "-loglevel", "error",  # Show only errors
+        "-y",
         "-i", safe_input,
-        "-vf", "scale='min(1920,iw)':-2",  # ⬅️ Resize down if >1080p (safe for iPhones)
+        "-vf", "scale='min(1280,iw)':-2",  # downscale to 720p max (stable for mobile)
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "23",
@@ -48,14 +50,20 @@ def reencode_video(input_path: str) -> str:
         output_path
     ]
 
+    print("🎬 Running ffmpeg command...")
     try:
-        completed = subprocess.run(command, capture_output=True, check=True, text=True)
-        print("✅ FFmpeg output:\n", completed.stdout)
-    except subprocess.CalledProcessError as e:
-        raise Exception(f"❌ FFmpeg crashed:\n{e.stderr or e.output}")
+        completed = subprocess.run(command, capture_output=True, text=True)
+        print("✅ FFmpeg STDOUT:\n", completed.stdout)
+        print("⚠️ FFmpeg STDERR:\n", completed.stderr)
+
+        if completed.returncode != 0:
+            raise Exception(f"FFmpeg failed:\n{completed.stderr.strip()}")
+
+    except Exception as e:
+        raise Exception(f"❌ FFmpeg crashed: {str(e)}")
 
     if not os.path.exists(output_path):
-        raise Exception("❌ Output file missing after encoding.")
+        raise Exception("❌ Output file was not created.")
 
     return output_path
 
