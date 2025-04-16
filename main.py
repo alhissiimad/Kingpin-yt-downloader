@@ -118,13 +118,15 @@ async def handle_button(client, callback):
 
     try:
         def format_filter(f):
-            return (
-                f.get("vcodec") != "vp9"
-                and f.get("vcodec") != "none"
-                and f.get("acodec") != "none"
-                and f.get("ext") == "mp4"
-                and f.get("filesize") is not None
-            )
+            if (
+                f.get("vcodec") == "vp9"
+                or f.get("vcodec") == "none"
+                or f.get("acodec") == "none"
+                or f.get("ext") != "mp4"
+                or f.get("filesize") is None
+            ):
+                return "❌ Skipping invalid format"
+            return None  # ✅ Means it's allowed
 
         ydl_opts = {
             'format': 'best',
