@@ -43,11 +43,9 @@ def reencode_video(input_path: str) -> str:
         "-loglevel", "error",
         "-y",
         "-i", safe_input,
-        "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",  # Ensure even dimensions
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",  # just fix odd resolution, no aspect distortion
         "-c:v", "libx264",
-        "-profile:v", "baseline",
-        "-level", "3.0",
-        "-pix_fmt", "yuv420p",
+        "-pix_fmt", "yuv420p",               # iPhone safe
         "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "aac",
@@ -72,8 +70,6 @@ def reencode_video(input_path: str) -> str:
         raise Exception("❌ Output file was not created.")
 
     return output_path
-
-
 
 @app.on_message(filters.command("start"))
 async def start(client, message):
