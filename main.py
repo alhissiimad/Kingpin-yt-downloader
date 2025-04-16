@@ -29,7 +29,9 @@ def reencode_video(input_path: str) -> str:
     output_path = "downloads/output_ios.mp4"
 
     try:
-        shutil.copy(input_path, safe_input)
+        safe_input = "downloads/input.mp4"
+        shutil.copyfile(input_path, safe_input)
+        
         print(f"✅ Copied to: {safe_input}")
     except Exception as e:
         raise Exception(f"❌ Failed to copy input: {e}")
@@ -40,7 +42,7 @@ def reencode_video(input_path: str) -> str:
     command = [
         "ffmpeg",
         "-hide_banner",
-        "-loglevel", "error",
+        "-loglevel", "info",
         "-y",
         "-hwaccel", "none",  # ⬅️ Add this line
         "-i", safe_input,
@@ -66,6 +68,15 @@ def reencode_video(input_path: str) -> str:
     print("🎬 Running ffmpeg command...")
     
     try:
+        print("📂 Input exists:", os.path.exists(safe_input))
+        print("📁 Input path:", safe_input)
+        print("📦 Output path:", output_path)
+        print("🐚 Running command:", " ".join(command))
+
+        probe = subprocess.run(["ffmpeg", "-i", safe_input], capture_output=True, text=True)
+        print("🔍 FFmpeg probe stdout:", probe.stdout)
+        print("🔍 FFmpeg probe stderr:", probe.stderr)
+
         completed = subprocess.run(command, capture_output=True, text=True)
         print("✅ FFmpeg STDOUT:\n", completed.stdout)
         print("⚠️ FFmpeg STDERR:\n", completed.stderr)
@@ -151,7 +162,7 @@ async def handle_button(client, callback):
         filename = max(files, key=os.path.getctime)
         await callback.message.reply(f"📁 Detected: `{filename}`")
 
-        time.sleep(1.5)
+        time.sleep(2)
         converted_file = reencode_video(filename)
 
         await client.send_video(
