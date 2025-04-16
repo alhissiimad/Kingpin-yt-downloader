@@ -23,12 +23,33 @@ def readable_size(size_bytes):
     return f"{mb:.2f} MB"
 
 def reencode_video(input_path: str) -> str:
-    import shutil
+    import tempfile
+
+    # Clean up partial files
+    for f in glob.glob("downloads/*.part"):
+        os.remove(f)
+
+    # Validate input file
+    if not os.path.exists(input_path) or os.path.getsize(input_path) < 1000:
+        raise Exception("❌ Video file is invalid or corrupted (missing or too small).")
+
+    # FFmpeg probe to validate input file
+    probe_cmd = [
+        "ffmpeg",
+        "-v", "error",
+        "-i", input_path,
+        "-f", "null", "-"
+    ]
+    probe_result = subprocess.run(probe_cmd, capture_output=True)
+    if probe_result.returncode != 0:
+        raise Exception(f"❌ FFmpeg validation failed: {probe_result.stderr.decode().strip()}")
+
     safe_input = "downloads/input_safe.mp4"
     output_path = "downloads/output_ios.mp4"
 
     try:
         shutil.copy(input_path, safe_input)
+        print(f"✅ Copied to: {safe_input}")
     except Exception as e:
         raise Exception(f"❌ Failed to copy input: {e}")
 
@@ -42,8 +63,9 @@ def reencode_video(input_path: str) -> str:
         "-y",
         "-hwaccel", "none",
         "-i", safe_input,
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",  # keep original aspect, safe for libx264
         "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
+        "-pix_fmt", "yuv420p",  # required for iPhone/iOS
         "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "aac",
@@ -52,16 +74,25 @@ def reencode_video(input_path: str) -> str:
         output_path
     ]
 
-    print("🎬 Running ffmpeg command:", " ".join(command))
+    print("🎬 Running ffmpeg command...")
+    print("👉 FFmpeg Command:", " ".join(command))
 
-    result = subprocess.run(command, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise Exception(f"FFmpeg failed:\n{result.stderr.strip()}")
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True)
+        print("✅ FFmpeg STDOUT:\n", completed.stdout)
+        print("⚠️ FFmpeg STDERR:\n", completed.stderr)
+
+        if completed.returncode != 0:
+            raise Exception(f"FFmpeg failed:\n{completed.stderr.strip()}")
+
+    except Exception as e:
+        raise Exception(f"❌ FFmpeg crashed: {str(e)}")
 
     if not os.path.exists(output_path):
         raise Exception("❌ Output file was not created.")
 
     return output_path
+
 
 
 @app.on_message(filters.command("start"))
