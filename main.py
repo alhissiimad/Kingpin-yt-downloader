@@ -1,134 +1,164 @@
 import os
 import glob
-import asyncio
+import subprocess
+import shutil
+import time
+
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from yt_dlp import YoutubeDL
-import subprocess
+from downloader import get_merged_formats
 
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
+app = Client("yt_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-app = Client("yt_bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
+MAX_SIZE_MB = 50
 
+def readable_size(size_bytes):
+    mb = size_bytes / (1024 * 1024)
+    return f"{mb:.2f} MB"
 
-def clean_downloads():
-    for f in glob.glob("downloads/*"):
-        os.remove(f)
+def reencode_video(input_path: str) -> str:
+    import tempfile
+    safe_input = "downloads/input_safe.mp4"
+    output_path = "downloads/output_ios.mp4"
 
+    try:
+        shutil.copy(input_path, safe_input)
+        print(f"✅ Copied to: {safe_input}")
+    except Exception as e:
+        raise Exception(f"❌ Failed to copy input: {e}")
 
-def sizeof_fmt(num, suffix="B"):
-    for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
-        if abs(num) < 1024.0:
-            return f"{num:.2f} {unit}{suffix}"
-        num /= 1024.0
-    return f"{num:.2f} Y{suffix}"
+    if not os.path.exists(safe_input):
+        raise Exception("❌ input_safe.mp4 not found.")
 
+    command = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",  # Show only errors
+        "-y",
+        "-i", safe_input,
+        "-vf", "scale='min(1280,iw)':-2",  # downscale to 720p max (stable for mobile)
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        output_path
+    ]
 
-def get_video_formats(url):
-    ydl_opts = {
-        "quiet": True,
-        "skip_download": True,
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
-    }
-    with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        formats = info.get("formats", [])
-        valid = []
-        for f in formats:
-            if not f.get("vcodec") or "audio only" in f.get("format_note", ""):
-                continue
-            if f.get("filesize") and f["filesize"] > 50 * 1024 * 1024:
-                continue
-            if not f.get("acodec") or f.get("acodec") == "none":
-                continue
-            label = f"{f['format_note']} | {sizeof_fmt(f['filesize'])}"
-            valid.append((label, f["format_id"]))
-        return valid
+    print("🎬 Running ffmpeg command...")
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True)
+        print("✅ FFmpeg STDOUT:\n", completed.stdout)
+        print("⚠️ FFmpeg STDERR:\n", completed.stderr)
+
+        if completed.returncode != 0:
+            raise Exception(f"FFmpeg failed:\n{completed.stderr.strip()}")
+
+    except Exception as e:
+        raise Exception(f"❌ FFmpeg crashed: {str(e)}")
+
+    if not os.path.exists(output_path):
+        raise Exception("❌ Output file was not created.")
+
+    return output_path
 
 
 @app.on_message(filters.command("start"))
-async def start_handler(client, message):
-    await message.reply("👋 Send me a YouTube video link.")
+async def start(client, message):
+    await message.reply("👋 Send me a YouTube link and I’ll show you available download options!")
 
-
-@app.on_message(filters.regex(r"https?://.*(youtube.com|youtu.be)/"))
-async def link_handler(client, message):
+@app.on_message(filters.text & filters.private)
+async def handle_youtube_link(client, message):
     url = message.text.strip()
-    await message.reply("🔍 Processing the video... Please wait.")
 
-    try:
-        formats = get_video_formats(url)
+    if "youtube.com" in url or "youtu.be" in url:
+        await message.reply("🔍 Processing the video... Please wait.")
+        try:
+            formats = get_merged_formats(url)
+        except Exception as e:
+            return await message.reply(f"❌ Failed to fetch formats.\nError: {e}")
+
         if not formats:
-            await message.reply("❌ No valid formats with sound found.")
-            return
+            return await message.reply("❌ No valid formats with sound found.")
 
-        buttons = [
-            [InlineKeyboardButton(text=label, callback_data=f"{format_id}|{url}")]
-            for label, format_id in formats
-        ]
+        buttons = []
+        for fmt in formats:
+            size_mb = fmt["filesize"] / (1024 * 1024)
+            label = f'{fmt["quality"]} | {readable_size(fmt["filesize"])}'
 
-        await message.reply(
-            "🎬 Choose a quality to download:",
-            reply_markup=InlineKeyboardMarkup(buttons),
-        )
+            if size_mb <= MAX_SIZE_MB:
+                buttons.append([InlineKeyboardButton(label, callback_data=f'dl|{url}|{fmt["format_id"]}')])
+            else:
+                buttons.append([InlineKeyboardButton(f'{label} 🚫 >50MB', callback_data="too_big")])
 
-    except Exception as e:
-        await message.reply(f"❌ Failed to process link.\n\n{e}")
-
+        await message.reply("🎬 Choose a quality to download:", reply_markup=InlineKeyboardMarkup(buttons))
+    else:
+        await message.reply("⚠️ Only YouTube links are supported for now.")
 
 @app.on_callback_query()
 async def handle_button(client, callback):
-    await callback.answer()
-    await callback.message.reply("📥 Downloading video...")
+    data = callback.data
 
-    clean_downloads()
-    fmt, url = callback.data.split("|")
+    if data == "too_big":
+        await callback.answer("❌ File too large for Telegram (over 50MB)", show_alert=True)
+        return
+
+    await callback.answer("⏬ Downloading... please wait.")
+    await callback.message.edit_text("📥 Downloading video...")
+
+    _, url, format_id = data.split("|")
 
     try:
+        from yt_dlp import YoutubeDL
         ydl_opts = {
-            "format": fmt,
-            "outtmpl": "downloads/input.mp4",
-            "merge_output_format": "mp4",
-            "quiet": True,
-            "no_warnings": True,
+            'format': f'{format_id}/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
+            'outtmpl': 'downloads/%(title)s.%(ext)s',
+            'quiet': True,
+            'merge_output_format': 'mp4',
+            'ffmpeg_location': '/usr/bin/ffmpeg',
         }
+
+        os.makedirs("downloads", exist_ok=True)
+
         with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            info = ydl.extract_info(url, download=True)
 
-        # Re-encode to ensure iPhone/web compatibility (force H.264 + AAC)
-        output_file = "downloads/output_ios.mp4"
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", "downloads/input.mp4",
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "23",
-            "-c:a", "aac",
-            "-b:a", "128k",
-            "-movflags", "+faststart",
-            output_file,
-        ]
-        process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        all_files = os.listdir("downloads")
+        await callback.message.reply(f"📂 Files in folder: {all_files}")
 
-        if process.returncode != 0:
-            raise Exception("FFmpeg failed:", process.stderr.decode())
+        files = glob.glob("**/*.mp4", recursive=True)
+        if not files:
+            raise Exception("❌ No video file found after download.")
 
-        await callback.message.reply_video(
-            video=output_file,
-            caption="✅ Here is your video!",
+        filename = max(files, key=os.path.getctime)
+        await callback.message.reply(f"📁 Detected: `{filename}`")
+
+        time.sleep(1.5)
+        converted_file = reencode_video(filename)
+
+        await client.send_video(
+            chat_id=callback.message.chat.id,
+            video=converted_file,
+            caption=f"🎬 {info.get('title', 'Here is your video')}"
         )
 
+        os.remove(filename)
+        os.remove(converted_file)
+        if os.path.exists("downloads/input_safe.mp4"):
+            os.remove("downloads/input_safe.mp4")
+
     except Exception as e:
-        await callback.message.reply(f"❌ Failed to download.\n\n**Reason:**\n{e}")
+        error_text = str(e)
+        if len(error_text) > 4000:
+            error_text = error_text[:3990] + '... (truncated)'
+        try:
+            await callback.message.reply(f"❌ Failed to download.\n\n**Reason:**\n`{error_text}`")
+        except Exception:
+            await client.send_message(callback.message.chat.id, f"❌ Failed.\nReason:\n`{error_text}`")
 
-    finally:
-        clean_downloads()
-
-
-if __name__ == "__main__":
-    os.makedirs("downloads", exist_ok=True)
-    print("Bot is running...")
-    app.run()
+app.run()
