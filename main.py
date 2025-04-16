@@ -38,11 +38,12 @@ def reencode_video(input_path: str) -> str:
     command = [
         "ffmpeg",
         "-hide_banner",
-        "-loglevel", "error",
+        "-loglevel", "error",  # Show only errors
         "-y",
+        "-hwaccel", "none",
         "-i", safe_input,
         "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",  # ✅ iOS compatible
+        "-pix_fmt", "yuv420p",
         "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "aac",
