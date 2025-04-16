@@ -157,6 +157,8 @@ async def handle_button(client, callback):
             raise Exception("❌ No video file found after download.")
         filename = max(files, key=os.path.getctime)
 
+        print("DEBUG >> Detected downloaded file:", filename)
+
         converted_file = reencode_video(filename)
 
         await client.send_video(
