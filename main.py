@@ -109,13 +109,11 @@ async def handle_button(client, callback):
 
         from yt_dlp import YoutubeDL
         ydl_opts = {
-            'format': format_id,
+            'format': f'{format_id}/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'quiet': True,
             'merge_output_format': 'mp4',
             'ffmpeg_location': '/usr/bin/ffmpeg',
-            'format_sort': ['+height'],
-            'match_filter': format_filter,
         }
 
         os.makedirs("downloads", exist_ok=True)
@@ -124,6 +122,10 @@ async def handle_button(client, callback):
             info = ydl.extract_info(url, download=True)
 
         files = glob.glob("downloads/*.mp4")
+        
+        all_files = os.listdir("downloads")
+        await callback.message.reply(f"📂 Files in folder: {all_files}")
+        
         if not files:
             raise Exception("❌ No video file found after download.")
 
