@@ -1,6 +1,7 @@
 import os
 import glob
 import subprocess
+import shutil
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -158,7 +159,8 @@ async def handle_button(client, callback):
         filename = max(files, key=os.path.getctime)
 
         safe_filename = "downloads/input.mp4"
-        os.rename(filename, safe_filename)
+        if filename != safe_filename:
+            shutil.move(filename, safe_filename)
         filename = safe_filename
 
         await callback.message.reply(f"📁 Detected: `{filename}`", quote=True)
