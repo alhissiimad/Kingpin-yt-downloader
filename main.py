@@ -25,10 +25,19 @@ def reencode_video(input_path: str) -> str:
     safe_input = "downloads/input_safe.mp4"
     output_path = "downloads/output_ios.mp4"
 
-    # Rename to safe filename
+    # Remove old files if they exist
     if os.path.exists(safe_input):
         os.remove(safe_input)
-    os.rename(input_path, safe_input)
+    if os.path.exists(output_path):
+        os.remove(output_path)
+
+    try:
+        os.rename(input_path, safe_input)
+    except Exception as e:
+        raise Exception(f"❌ Failed to rename input file: {e}")
+
+    if os.path.getsize(safe_input) < 1000:
+        raise Exception("❌ Downloaded file is empty or too small.")
 
     command = [
         "ffmpeg",
@@ -42,7 +51,14 @@ def reencode_video(input_path: str) -> str:
         output_path
     ]
 
-    subprocess.run(command, check=True)
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"❌ FFmpeg crashed while converting: {e}")
+
+    if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
+        raise Exception("❌ Output video file is missing or empty.")
+
     return output_path
 
 
@@ -123,7 +139,6 @@ async def handle_button(client, callback):
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        # fallback rename if yt-dlp returned weird ext
         if not filename.endswith(".mp4"):
             new_filename = filename.replace(".webm", ".mp4")
             os.rename(filename, new_filename)
@@ -143,7 +158,7 @@ async def handle_button(client, callback):
             os.remove("downloads/input_safe.mp4")
 
     except Exception as e:
-        await callback.message.reply(f"❌ Failed to download.\nError: `{e}`")
+        await callback.message.reply(f"❌ Failed to download.\n\n**Reason:** `{e}`")
 
 
 app.run()
