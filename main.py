@@ -1,6 +1,5 @@
 import os
 import subprocess
-import shlex
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -21,12 +20,19 @@ def readable_size(size_bytes):
 
 
 def reencode_video(input_path: str) -> str:
-    base, ext = os.path.splitext(input_path)
-    output_path = f"{base}_ios.mp4"
+    os.makedirs("downloads", exist_ok=True)
+
+    safe_input = "downloads/input_safe.mp4"
+    output_path = "downloads/output_ios.mp4"
+
+    # Rename to safe filename
+    if os.path.exists(safe_input):
+        os.remove(safe_input)
+    os.rename(input_path, safe_input)
 
     command = [
         "ffmpeg",
-        "-i", input_path,
+        "-i", safe_input,
         "-c:v", "libx264",
         "-preset", "fast",
         "-crf", "23",
@@ -117,6 +123,12 @@ async def handle_button(client, callback):
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
+        # fallback rename if yt-dlp returned weird ext
+        if not filename.endswith(".mp4"):
+            new_filename = filename.replace(".webm", ".mp4")
+            os.rename(filename, new_filename)
+            filename = new_filename
+
         converted_file = reencode_video(filename)
 
         await client.send_video(
@@ -127,6 +139,8 @@ async def handle_button(client, callback):
 
         os.remove(filename)
         os.remove(converted_file)
+        if os.path.exists("downloads/input_safe.mp4"):
+            os.remove("downloads/input_safe.mp4")
 
     except Exception as e:
         await callback.message.reply(f"❌ Failed to download.\nError: `{e}`")
