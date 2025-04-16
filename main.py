@@ -83,13 +83,36 @@ async def handle_button(client, callback):
         ydl_opts = {
             'format': format_id,
             'outtmpl': 'downloads/%(title)s.%(ext)s',
+            'quiet': True,
+            'postprocessors': [
+                {
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4'
+                },
+                {
+                    'key': 'FFmpegVideoRemuxer',
+                    'preferedformat': 'mp4'
+                },
+                {
+                    'key': 'FFmpegEmbedSubtitle'
+                },
+                {
+                    'key': 'FFmpegMetadata'
+                },
+                {
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'aac',
+                    'preferredquality': '192'
+                },
+                {
+                    'key': 'FFmpegVideoConvertor',
+                    'preferedformat': 'mp4'
+                }
+            ],
             'merge_output_format': 'mp4',
-            'postprocessors': [{
-                'key': 'FFmpegVideoConvertor',
-                'preferedformat': 'mp4'  # Force iOS-friendly encoding
-            }],
-            'quiet': True
+            'ffmpeg_location': '/usr/bin/ffmpeg'
         }
+
 
         os.makedirs("downloads", exist_ok=True)
 
