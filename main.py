@@ -42,16 +42,17 @@ def reencode_video(input_path: str) -> str:
         "-hide_banner",
         "-loglevel", "error",
         "-y",
+        "-hwaccel", "none",  # ⬅️ Add this line
         "-i", safe_input,
-        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",  # just fix odd resolution, no aspect distortion
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
         "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",               # iPhone safe
+        "-pix_fmt", "yuv420p",
         "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "aac",
         "-b:a", "128k",
         "-movflags", "+faststart",
-        output_path
+        output_path,
     ]
 
     print("✅ INPUT EXISTS:", os.path.exists(safe_input))
