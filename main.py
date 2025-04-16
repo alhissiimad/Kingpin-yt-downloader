@@ -1,5 +1,5 @@
 import os
-from downloader import get_muxed_formats
+from downloader import get_merged_formats
 from yt_dlp import YoutubeDL
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -34,7 +34,7 @@ async def handle_youtube_link(client, message):
         await message.reply("🔍 Processing the video... Please wait.")
 
         try:
-            formats = get_muxed_formats(url)
+            formats = get_merged_formats(url)
         except Exception as e:
             return await message.reply(
                 f"❌ Failed to fetch formats.\nError: {e}")
@@ -84,7 +84,7 @@ async def handle_button(client, callback):
             'format': format_id,
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'merge_output_format': 'mp4',
-            'quiet': True,
+            'quiet': True
         }
 
         os.makedirs("downloads", exist_ok=True)
