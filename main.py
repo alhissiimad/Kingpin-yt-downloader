@@ -40,6 +40,10 @@ def reencode_video(input_path: str) -> str:
         "-i", input_path,
         "-f", "null", "-"
     ]
+
+    print("🔍 FFmpeg Probe STDERR:\n", probe_result.stderr.decode().strip())
+    print("🔍 FFmpeg Probe Return Code:", probe_result.returncode)
+
     probe_result = subprocess.run(probe_cmd, capture_output=True)
     if probe_result.returncode != 0:
         raise Exception(f"❌ FFmpeg validation failed: {probe_result.stderr.decode().strip()}")
@@ -78,6 +82,10 @@ def reencode_video(input_path: str) -> str:
     print("👉 FFmpeg Command:", " ".join(command))
 
     try:
+        print("🎬 FFmpeg ENCODE CMD:", " ".join(command))
+        print("🎬 FFmpeg ENCODE Return Code:", completed.returncode)
+        print("🎬 FFmpeg STDERR:", completed.stderr)
+        
         completed = subprocess.run(command, capture_output=True, text=True)
         print("✅ FFmpeg STDOUT:\n", completed.stdout)
         print("⚠️ FFmpeg STDERR:\n", completed.stderr)
