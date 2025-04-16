@@ -61,7 +61,7 @@ def reencode_video(input_path: str) -> str:
         print("⚠️ FFmpeg STDERR:\n", completed.stderr)
 
         if completed.returncode != 0:
-            raise Exception(f"FFmpeg failed:\n{completed.stderr.strip()}")
+            raise Exception(f"FFmpeg failed:\n{completed.stderr.strip()}\n\nCommand used:\n{' '.join(command)}")
 
     except Exception as e:
         raise Exception(f"❌ FFmpeg crashed: {str(e)}")
