@@ -21,7 +21,10 @@ def readable_size(size_bytes):
     return f"{mb:.2f} MB"
 
 def reencode_video(input_path: str) -> str:
-    import tempfile
+    import shutil
+    import subprocess
+    import os
+
     safe_input = "downloads/input_safe.mp4"
     output_path = "downloads/output_ios.mp4"
 
@@ -37,12 +40,14 @@ def reencode_video(input_path: str) -> str:
     command = [
         "ffmpeg",
         "-hide_banner",
-        "-loglevel", "error",  # Show only errors
+        "-loglevel", "error",
         "-y",
         "-i", safe_input,
-        # "-vf", "scale='min(1280,iw)':-2",  # downscale to 720p max (stable for mobile)
-        "-vf", "scale='if(gt(iw,1280),1280,iw)':'if(gt(iw,1280),-2,ih)',setsar=1",
+        "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",  # Ensure even dimensions
         "-c:v", "libx264",
+        "-profile:v", "baseline",
+        "-level", "3.0",
+        "-pix_fmt", "yuv420p",
         "-preset", "ultrafast",
         "-crf", "23",
         "-c:a", "aac",
@@ -67,6 +72,7 @@ def reencode_video(input_path: str) -> str:
         raise Exception("❌ Output file was not created.")
 
     return output_path
+
 
 
 @app.on_message(filters.command("start"))
