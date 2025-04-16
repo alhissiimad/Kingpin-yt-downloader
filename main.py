@@ -1,4 +1,5 @@
 import os
+import glob
 import subprocess
 
 from pyrogram import Client, filters
@@ -126,7 +127,7 @@ async def handle_button(client, callback):
                 or f.get("filesize") is None
             ):
                 return "❌ Skipping invalid format"
-            return None  # ✅ Means it's allowed
+            return None
 
         ydl_opts = {
             'format': 'best',
@@ -149,12 +150,12 @@ async def handle_button(client, callback):
         from yt_dlp import YoutubeDL
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
 
-        if not filename.endswith(".mp4"):
-            new_filename = filename.replace(".webm", ".mp4")
-            os.rename(filename, new_filename)
-            filename = new_filename
+        # Get actual downloaded file (latest .mp4)
+        files = glob.glob("downloads/*.mp4")
+        if not files:
+            raise Exception("❌ No video file found after download.")
+        filename = max(files, key=os.path.getctime)
 
         converted_file = reencode_video(filename)
 
