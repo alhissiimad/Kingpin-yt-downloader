@@ -23,6 +23,7 @@ def readable_size(size_bytes):
     return f"{mb:.2f} MB"
 
 def reencode_video(input_path: str) -> str:
+    import shutil
     safe_input = "downloads/input_safe.mp4"
     output_path = "downloads/output_ios.mp4"
 
@@ -35,26 +36,32 @@ def reencode_video(input_path: str) -> str:
         raise Exception("❌ input_safe.mp4 not found.")
 
     command = [
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-        "-hwaccel", "none",
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel", "error",
+        "-y",
         "-i", safe_input,
-        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p",
-        "-preset", "ultrafast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "128k",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",  # ✅ iOS compatible
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
         "-movflags", "+faststart",
         output_path
     ]
 
-    completed = subprocess.run(command, capture_output=True, text=True)
+    print("🎬 Running ffmpeg command:", " ".join(command))
 
-    if completed.returncode != 0:
-        raise Exception(f"FFmpeg failed:\n{completed.stderr.strip()}")
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise Exception(f"FFmpeg failed:\n{result.stderr.strip()}")
 
     if not os.path.exists(output_path):
         raise Exception("❌ Output file was not created.")
 
     return output_path
+
 
 @app.on_message(filters.command("start"))
 async def start(client, message):
