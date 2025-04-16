@@ -29,28 +29,36 @@ def reencode_video(input_path: str) -> str:
     try:
         shutil.copy(input_path, safe_input)
     except Exception as e:
-        raise Exception(f"❌ Failed to copy to safe input: {e}")
+        raise Exception(f"❌ Failed to copy input: {e}")
 
     if not os.path.exists(safe_input):
-        raise Exception("❌ input_safe.mp4 not found after copy.")
+        raise Exception("❌ input_safe.mp4 missing after copy.")
 
     command = [
-        "ffmpeg", "-i", safe_input,
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "128k",
+        "ffmpeg",
+        "-y",  # overwrite without asking
+        "-i", safe_input,
+        "-vf", "scale='min(1920,iw)':-2",  # ⬅️ Resize down if >1080p (safe for iPhones)
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
         "-movflags", "+faststart",
         output_path
     ]
 
     try:
-        subprocess.run(command, check=True, capture_output=True, text=True)
+        completed = subprocess.run(command, capture_output=True, check=True, text=True)
+        print("✅ FFmpeg output:\n", completed.stdout)
     except subprocess.CalledProcessError as e:
-        raise Exception(f"❌ FFmpeg crashed:\n{e.stderr or str(e)}")
+        raise Exception(f"❌ FFmpeg crashed:\n{e.stderr or e.output}")
 
     if not os.path.exists(output_path):
-        raise Exception("❌ Output video file not found.")
+        raise Exception("❌ Output file missing after encoding.")
 
     return output_path
+
 
 @app.on_message(filters.command("start"))
 async def start(client, message):
