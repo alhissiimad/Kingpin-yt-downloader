@@ -40,7 +40,8 @@ def reencode_video(input_path: str) -> str:
         "-loglevel", "error",  # Show only errors
         "-y",
         "-i", safe_input,
-        "-vf", "scale='min(1280,iw)':-2",  # downscale to 720p max (stable for mobile)
+        # "-vf", "scale='min(1280,iw)':-2",  # downscale to 720p max (stable for mobile)
+        "-vf", "scale='if(gt(iw,1280),1280,iw)':'if(gt(iw,1280),-2,ih)',setsar=1",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "23",
