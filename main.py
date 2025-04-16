@@ -57,8 +57,18 @@ def reencode_video(input_path: str) -> str:
     except Exception as e:
         raise Exception(f"❌ Failed to copy input: {e}")
 
-    if not os.path.exists(safe_input):
+       if not os.path.exists(safe_input):
         raise Exception("❌ input_safe.mp4 not found.")
+
+        # Optional probe to validate file (debugging broken/corrupt downloads)
+        probe_cmd = ["ffmpeg", "-v", "error", "-i", safe_input, "-f", "null", "-"]
+        probe_result = subprocess.run(probe_cmd, capture_output=True)
+        print("🔍 FFmpeg Probe Return Code:", probe_result.returncode)
+        print("🔍 FFmpeg Probe STDERR:\n", probe_result.stderr.decode().strip())
+    
+        if probe_result.returncode != 0:
+            raise Exception("❌ FFmpeg Probe failed:\n" + probe_result.stderr.decode().strip())
+
 
     command = [
         "ffmpeg",
