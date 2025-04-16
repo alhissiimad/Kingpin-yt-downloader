@@ -59,6 +59,10 @@ def reencode_video(input_path: str) -> str:
     print("📦 INPUT PATH:", safe_input)
     print("📁 OUTPUT PATH:", output_path)
 
+    print("📂 Input exists?", os.path.exists(safe_input))
+    print("📥 Input file:", safe_input)
+    print("📤 Output file will be:", output_path)
+
     print("🎬 Running ffmpeg command...")
     
     try:
