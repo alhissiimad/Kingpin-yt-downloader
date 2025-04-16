@@ -121,7 +121,7 @@ async def handle_button(client, callback):
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-        files = glob.glob("downloads/*.mp4")
+        files = glob.glob("**/*.mp4", recursive=True)
         
         all_files = os.listdir("downloads")
         await callback.message.reply(f"📂 Files in folder: {all_files}")
