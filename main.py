@@ -3,6 +3,7 @@ import glob
 import subprocess
 import shutil
 import time
+from uuid import uuid4
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -15,24 +16,18 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 app = Client("yt_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 MAX_SIZE_MB = 50
+format_cache = {}
 
 def readable_size(size_bytes):
     mb = size_bytes / (1024 * 1024)
     return f"{mb:.2f} MB"
 
 def reencode_video(input_path: str) -> str:
-    import shutil
-    import subprocess
-    import os
-
     safe_input = "downloads/input_safe.mp4"
     output_path = "downloads/output_ios.mp4"
 
     try:
-        safe_input = "downloads/input.mp4"
-        shutil.copyfile(input_path, safe_input)
-        
-        print(f"✅ Copied to: {safe_input}")
+        shutil.copy(input_path, safe_input)
     except Exception as e:
         raise Exception(f"❌ Failed to copy input: {e}")
 
@@ -40,52 +35,21 @@ def reencode_video(input_path: str) -> str:
         raise Exception("❌ input_safe.mp4 not found.")
 
     command = [
-        "ffmpeg",
-        "-hide_banner",
-        "-loglevel", "info",
-        "-y",
-        "-hwaccel", "none",  # ⬅️ Add this line
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-hwaccel", "none",
         "-i", safe_input,
         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-preset", "ultrafast",
-        "-crf", "23",
-        "-c:a", "aac",
-        "-b:a", "128k",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p",
+        "-preset", "ultrafast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
-        output_path,
+        output_path
     ]
 
-    print("✅ INPUT EXISTS:", os.path.exists(safe_input))
-    print("📦 INPUT PATH:", safe_input)
-    print("📁 OUTPUT PATH:", output_path)
+    completed = subprocess.run(command, capture_output=True, text=True)
 
-    print("📂 Input exists?", os.path.exists(safe_input))
-    print("📥 Input file:", safe_input)
-    print("📤 Output file will be:", output_path)
-
-    print("🎬 Running ffmpeg command...")
-    
-    try:
-        print("📂 Input exists:", os.path.exists(safe_input))
-        print("📁 Input path:", safe_input)
-        print("📦 Output path:", output_path)
-        print("🐚 Running command:", " ".join(command))
-
-        probe = subprocess.run(["ffmpeg", "-i", safe_input], capture_output=True, text=True)
-        print("🔍 FFmpeg probe stdout:", probe.stdout)
-        print("🔍 FFmpeg probe stderr:", probe.stderr)
-
-        completed = subprocess.run(command, capture_output=True, text=True)
-        print("✅ FFmpeg STDOUT:\n", completed.stdout)
-        print("⚠️ FFmpeg STDERR:\n", completed.stderr)
-
-        if completed.returncode != 0:
-            raise Exception(f"FFmpeg failed:\n{completed.stderr.strip()}\n\nCommand used:\n{' '.join(command)}")
-
-    except Exception as e:
-        raise Exception(f"❌ FFmpeg crashed: {str(e)}")
+    if completed.returncode != 0:
+        raise Exception(f"FFmpeg failed:\n{completed.stderr.strip()}")
 
     if not os.path.exists(output_path):
         raise Exception("❌ Output file was not created.")
@@ -99,7 +63,6 @@ async def start(client, message):
 @app.on_message(filters.text & filters.private)
 async def handle_youtube_link(client, message):
     url = message.text.strip()
-
     if "youtube.com" in url or "youtu.be" in url:
         await message.reply("🔍 Processing the video... Please wait.")
         try:
@@ -110,13 +73,15 @@ async def handle_youtube_link(client, message):
         if not formats:
             return await message.reply("❌ No valid formats with sound found.")
 
+        session_id = str(uuid4())[:8]
+        format_cache[session_id] = {"url": url, "formats": formats}
+
         buttons = []
-        for fmt in formats:
+        for i, fmt in enumerate(formats):
             size_mb = fmt["filesize"] / (1024 * 1024)
             label = f'{fmt["quality"]} | {readable_size(fmt["filesize"])}'
-
             if size_mb <= MAX_SIZE_MB:
-                buttons.append([InlineKeyboardButton(label, callback_data=f'dl|{url}|{fmt["format_id"]}')])
+                buttons.append([InlineKeyboardButton(label, callback_data=f'dl|{session_id}|{i}')])
             else:
                 buttons.append([InlineKeyboardButton(f'{label} 🚫 >50MB', callback_data="too_big")])
 
@@ -135,9 +100,17 @@ async def handle_button(client, callback):
     await callback.answer("⏬ Downloading... please wait.")
     await callback.message.edit_text("📥 Downloading video...")
 
-    _, url, format_id = data.split("|")
+    _, session_id, index = data.split("|")
+    index = int(index)
 
     try:
+        if session_id not in format_cache:
+            raise Exception("Session expired or invalid.")
+
+        info = format_cache[session_id]
+        url = info["url"]
+        format_id = info["formats"][index]["format_id"]
+
         from yt_dlp import YoutubeDL
         ydl_opts = {
             'format': f'{format_id}/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
@@ -152,17 +125,12 @@ async def handle_button(client, callback):
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-        all_files = os.listdir("downloads")
-        await callback.message.reply(f"📂 Files in folder: {all_files}")
-
-        files = glob.glob("**/*.mp4", recursive=True)
+        files = glob.glob("downloads/*.mp4")
         if not files:
             raise Exception("❌ No video file found after download.")
 
         filename = max(files, key=os.path.getctime)
-        await callback.message.reply(f"📁 Detected: `{filename}`")
 
-        time.sleep(2)
         converted_file = reencode_video(filename)
 
         await client.send_video(
