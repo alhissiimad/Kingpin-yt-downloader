@@ -2,7 +2,7 @@ import os
 import glob
 import subprocess
 import shutil
-
+import time
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from downloader import get_merged_formats
@@ -165,6 +165,8 @@ async def handle_button(client, callback):
 
         await callback.message.reply(f"📁 Detected: `{filename}`", quote=True)
 
+        filename = safe_filename
+        time.sleep(1.5)
         converted_file = reencode_video(filename)
 
         await client.send_video(
