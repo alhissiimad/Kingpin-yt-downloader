@@ -84,6 +84,10 @@ async def handle_button(client, callback):
             'format': format_id,
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'merge_output_format': 'mp4',
+            'postprocessors': [{
+                'key': 'FFmpegVideoConvertor',
+                'preferedformat': 'mp4'  # Force iOS-friendly encoding
+            }],
             'quiet': True
         }
 
