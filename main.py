@@ -117,12 +117,23 @@ async def handle_button(client, callback):
     _, url, format_id = data.split("|")
 
     try:
+        def format_filter(f):
+            return (
+                f.get("vcodec") != "vp9"
+                and f.get("vcodec") != "none"
+                and f.get("acodec") != "none"
+                and f.get("ext") == "mp4"
+                and f.get("filesize") is not None
+            )
+
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4][vcodec!=vp9]+bestaudio[ext=m4a]/best[ext=mp4][vcodec!=vp9]',
+            'format': 'best',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'quiet': True,
             'merge_output_format': 'mp4',
             'ffmpeg_location': '/usr/bin/ffmpeg',
+            'format_sort': ['+height'],
+            'match_filter': format_filter,
             'postprocessors': [
                 {
                     'key': 'FFmpegVideoConvertor',
@@ -138,16 +149,10 @@ async def handle_button(client, callback):
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        # Fallback rename if ext is not mp4
         if not filename.endswith(".mp4"):
             new_filename = filename.replace(".webm", ".mp4")
             os.rename(filename, new_filename)
             filename = new_filename
-
-        # Double check selected format to avoid vp9
-        selected_format = next((f for f in info['formats'] if f.get('format_id') == format_id), None)
-        if selected_format and 'vp9' in selected_format.get('vcodec', ''):
-            raise Exception("❌ VP9 format detected. Please choose a lower resolution (no VP9).")
 
         converted_file = reencode_video(filename)
 
