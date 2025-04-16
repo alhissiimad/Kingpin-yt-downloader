@@ -25,7 +25,6 @@ def reencode_video(input_path: str) -> str:
     safe_input = "downloads/input_safe.mp4"
     output_path = "downloads/output_ios.mp4"
 
-    # Clean up old files if any
     if os.path.exists(safe_input):
         os.remove(safe_input)
     if os.path.exists(output_path):
@@ -119,7 +118,7 @@ async def handle_button(client, callback):
 
     try:
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4][vcodec!=vp9]+bestaudio[ext=m4a]/best[ext=mp4]',
+            'format': 'bestvideo[ext=mp4][vcodec!=vp9]+bestaudio[ext=m4a]/best[ext=mp4][vcodec!=vp9]',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'quiet': True,
             'merge_output_format': 'mp4',
@@ -139,10 +138,16 @@ async def handle_button(client, callback):
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
+        # Fallback rename if ext is not mp4
         if not filename.endswith(".mp4"):
             new_filename = filename.replace(".webm", ".mp4")
             os.rename(filename, new_filename)
             filename = new_filename
+
+        # Double check selected format to avoid vp9
+        selected_format = next((f for f in info['formats'] if f.get('format_id') == format_id), None)
+        if selected_format and 'vp9' in selected_format.get('vcodec', ''):
+            raise Exception("❌ VP9 format detected. Please choose a lower resolution (no VP9).")
 
         converted_file = reencode_video(filename)
 
