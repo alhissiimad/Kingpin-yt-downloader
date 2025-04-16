@@ -98,15 +98,6 @@ async def handle_button(client, callback):
     _, url, format_id = data.split("|")
 
     try:
-        def format_filter(f):
-            if (
-                f.get("vcodec") == "vp9" or f.get("vcodec") == "none" or
-                f.get("acodec") == "none" or f.get("ext") != "mp4" or
-                f.get("filesize") is None
-            ):
-                return "❌ Skipping invalid format"
-            return None
-
         from yt_dlp import YoutubeDL
         ydl_opts = {
             'format': f'{format_id}/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
@@ -121,11 +112,10 @@ async def handle_button(client, callback):
         with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-        files = glob.glob("**/*.mp4", recursive=True)
-        
         all_files = os.listdir("downloads")
         await callback.message.reply(f"📂 Files in folder: {all_files}")
-        
+
+        files = glob.glob("**/*.mp4", recursive=True)
         if not files:
             raise Exception("❌ No video file found after download.")
 
@@ -147,6 +137,12 @@ async def handle_button(client, callback):
             os.remove("downloads/input_safe.mp4")
 
     except Exception as e:
-        await callback.message.reply(f"❌ Failed to download.\n\n**Reason:**\n`{e}`")
+        error_text = str(e)
+        if len(error_text) > 4000:
+            error_text = error_text[:3990] + '... (truncated)'
+        try:
+            await callback.message.reply(f"❌ Failed to download.\n\n**Reason:**\n`{error_text}`")
+        except Exception:
+            await client.send_message(callback.message.chat.id, f"❌ Failed.\nReason:\n`{error_text}`")
 
 app.run()
