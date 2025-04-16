@@ -40,7 +40,7 @@ def reencode_video(input_path: str) -> str:
         "-loglevel", "error",  # Show only errors
         "-y",
         "-i", safe_input,
-        "-vf", "scale='if(gt(iw,1920),1920,iw)':-2",
+        "-vf", "scale='if(gt(iw\\,1920)\\,1920\\,iw)':-2",
         "-c:v", "libx264",
         "-preset", "ultrafast",
         "-crf", "23",
@@ -129,14 +129,14 @@ async def handle_button(client, callback):
             info = ydl.extract_info(url, download=True)
 
         all_files = os.listdir("downloads")
-        await callback.message.reply(f"📂 Files in folder: {all_files}")
+        # await callback.message.reply(f"📂 Files in folder: {all_files}")
 
         files = glob.glob("**/*.mp4", recursive=True)
         if not files:
             raise Exception("❌ No video file found after download.")
 
         filename = max(files, key=os.path.getctime)
-        await callback.message.reply(f"📁 Detected: `{filename}`")
+        # await callback.message.reply(f"📁 Detected: `{filename}`")
 
         time.sleep(1.5)
         converted_file = reencode_video(filename)
