@@ -25,7 +25,7 @@ def reencode_video(input_path: str) -> str:
     safe_input = "downloads/input_safe.mp4"
     output_path = "downloads/output_ios.mp4"
 
-    # Remove old files if they exist
+    # Clean up old files if any
     if os.path.exists(safe_input):
         os.remove(safe_input)
     if os.path.exists(output_path):
@@ -52,9 +52,9 @@ def reencode_video(input_path: str) -> str:
     ]
 
     try:
-        subprocess.run(command, check=True)
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        raise Exception(f"❌ FFmpeg crashed while converting: {e}")
+        raise Exception(f"❌ FFmpeg crashed:\n{e.stderr or str(e)}")
 
     if not os.path.exists(output_path) or os.path.getsize(output_path) < 1000:
         raise Exception("❌ Output video file is missing or empty.")
@@ -158,7 +158,7 @@ async def handle_button(client, callback):
             os.remove("downloads/input_safe.mp4")
 
     except Exception as e:
-        await callback.message.reply(f"❌ Failed to download.\n\n**Reason:** `{e}`")
+        await callback.message.reply(f"❌ Failed to download.\n\n**Reason:**\n`{e}`")
 
 
 app.run()
