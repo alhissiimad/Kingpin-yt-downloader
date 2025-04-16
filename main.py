@@ -81,37 +81,19 @@ async def handle_button(client, callback):
 
     try:
         ydl_opts = {
-            'format': format_id,
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'quiet': True,
+            'merge_output_format': 'mp4',
             'postprocessors': [
-                {
-                    'key': 'FFmpegVideoConvertor',
-                    'preferedformat': 'mp4'
-                },
-                {
-                    'key': 'FFmpegVideoRemuxer',
-                    'preferedformat': 'mp4'
-                },
-                {
-                    'key': 'FFmpegEmbedSubtitle'
-                },
-                {
-                    'key': 'FFmpegMetadata'
-                },
-                {
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'aac',
-                    'preferredquality': '192'
-                },
                 {
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4'
                 }
             ],
-            'merge_output_format': 'mp4',
             'ffmpeg_location': '/usr/bin/ffmpeg'
         }
+
 
 
         os.makedirs("downloads", exist_ok=True)
