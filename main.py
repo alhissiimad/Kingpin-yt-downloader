@@ -1,6 +1,6 @@
 import os
 import subprocess
-import shutil
+import shlex
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -21,8 +21,10 @@ def readable_size(size_bytes):
 
 
 def reencode_video(input_path: str) -> str:
-    output_path = input_path.replace(".mp4", "_ios.mp4")
-    subprocess.run([
+    base, ext = os.path.splitext(input_path)
+    output_path = f"{base}_ios.mp4"
+
+    command = [
         "ffmpeg",
         "-i", input_path,
         "-c:v", "libx264",
@@ -32,7 +34,9 @@ def reencode_video(input_path: str) -> str:
         "-b:a", "128k",
         "-movflags", "+faststart",
         output_path
-    ], check=True)
+    ]
+
+    subprocess.run(command, check=True)
     return output_path
 
 
@@ -93,7 +97,7 @@ async def handle_button(client, callback):
 
     try:
         ydl_opts = {
-            'format': format_id,
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]',
             'outtmpl': 'downloads/%(title)s.%(ext)s',
             'quiet': True,
             'merge_output_format': 'mp4',
